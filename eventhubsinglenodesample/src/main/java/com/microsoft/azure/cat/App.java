@@ -52,6 +52,9 @@ public class App
             logger.info("Close signal received; shutting down receiver");
             CloseProcessorHost();
             logger.info("Close complete; exiting application");
+
+            // TODO - fix the thread pool shutdown issue blocking the app from exiting cleanly
+            System.exit(0);
         }
         catch (Exception e)
         {
