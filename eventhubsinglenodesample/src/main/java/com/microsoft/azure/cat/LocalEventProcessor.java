@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 public class LocalEventProcessor
@@ -106,7 +107,23 @@ public class LocalEventProcessor
 
     public void Stop()
     {
+        for (PartitionProcessor p : processors)
+        {
+            logger.info("Stopping processor on event hub {} for partition {}",
+                    eventHubName, p.getPartitionId());
+            p.Stop();
+        }
 
+        // TODO - fix the race condition here where not all of the checkpoints have finished
+
+        this.checkpointManager.shutdown();
+
+        this.executor.shutdown();
+        try {
+            this.executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+
+        }
     }
 
 }

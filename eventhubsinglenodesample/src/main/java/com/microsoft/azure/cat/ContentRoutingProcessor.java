@@ -32,7 +32,9 @@ public class ContentRoutingProcessor implements IEventProcessor
             processEvent(event);
         }
 
-        logger.debug("Checkpointing progress");
+        logger.debug("Checkpointing progress for event hub {} on partition {} to offset {}",
+                context.getEventHubPath(), context.getPartitionId(),
+                context.getCurrentOffset());
         context.checkpoint();
     }
 

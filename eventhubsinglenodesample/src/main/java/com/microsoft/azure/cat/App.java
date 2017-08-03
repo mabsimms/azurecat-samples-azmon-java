@@ -37,6 +37,8 @@ public class App
             String consumerGroup = eventHubProperties.getProperty("eventhub.consumerGroup");
             if (Strings.isNullOrEmpty(consumerGroup))
                 consumerGroup = "$Default";
+            else
+                consumerGroup = consumerGroup.replace("\"", "");
 
             logger.info("Creating processor host for event hub {} consumer group {}",
                     eventHubName, consumerGroup);
@@ -46,10 +48,47 @@ public class App
 
             Scanner scanner = new Scanner(System.in);
             String line = scanner.nextLine();
+
+            logger.info("Close signal received; shutting down receiver");
+            CloseProcessorHost();
+            logger.info("Close complete; exiting application");
         }
         catch (Exception e)
         {
             System.out.println(e.toString());
+        }
+    }
+
+    private static void CloseProcessorHost() {
+        if (localProcessor == null)
+            return;
+
+        localProcessor.Stop();
+    }
+
+    private static LocalEventProcessor localProcessor;
+
+    public static void CreateProcessorHost(String hostName, String eventHubName,
+        String eventHubConnectionString, String consumerGroup, String checkpointDirectory)
+    {
+        try {
+            // Use the content routing processor for handling events from Event Hub
+            Function<Void, IEventProcessor> factoryFunction = (Void) -> new ContentRoutingProcessor();
+
+            // Use the local file system for checkpointing progress (only suitable for single-node durable systems).
+            // For multi-node systems use the EventProcessorHost
+            localProcessor = new LocalEventProcessor(
+                    eventHubName, eventHubConnectionString, checkpointDirectory,
+                    consumerGroup, factoryFunction);
+            localProcessor.Start();
+        }
+        catch (Exception e)
+        {
+            logger.error("Failure while registering event processor host", e);
+            if (e instanceof ExecutionException) {
+                Throwable inner = e.getCause();
+                logger.error(inner.toString());
+            }
         }
     }
 
@@ -66,36 +105,14 @@ public class App
         }
     }
 
-    public static void CreateProcessorHost(String hostName, String eventHubName,
-        String eventHubConnectionString, String consumerGroup, String checkpointDirectory)
-    {
-        try {
-            // Use the content routing processor for handling events from Event Hub
-            Function<Void, IEventProcessor> factoryFunction = (Void) -> new ContentRoutingProcessor();
-
-            // Use the local file system for checkpointing progress (only suitable for single-node durable systems).
-            // For multi-node systems use the EventProcessorHost
-            LocalEventProcessor localProcessor = new LocalEventProcessor(
-                    eventHubName, eventHubConnectionString, checkpointDirectory,
-                    consumerGroup, factoryFunction);
-            localProcessor.Start();
-        }
-        catch (Exception e)
-        {
-            logger.error("Failure while registering event processor host", e);
-            if (e instanceof ExecutionException) {
-                Throwable inner = e.getCause();
-                logger.error(inner.toString());
-            }
-        }
-    }
-
     static Properties LoadProperties(String resourceName) throws IOException
     {
         logger.info("Loading resource {}", resourceName);
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         Properties props = new Properties();
         try(InputStream resourceStream = loader.getResourceAsStream(resourceName)) {
+            if (resourceStream == null)
+                throw new IOException("Could not open resource file " + resourceName);
             props.load(resourceStream);
         }
         return props;

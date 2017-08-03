@@ -31,6 +31,8 @@ public class PartitionProcessor
     private EventHubClient eventHubClient;
     private Checkpoint checkpoint;
     private PartitionReceiveHandler receiverHandler;
+    private PartitionReceiver receiver;
+
     private PartitionContext partitionContext;
     private IEventProcessor userProcessor;
 
@@ -66,7 +68,6 @@ public class PartitionProcessor
 
         // Initialize the partition reader, either from the offset or timestamp (Instant) provided
         // by the available checkpoint
-        PartitionReceiver receiver;
         if (initialOffset instanceof Instant)
         {
             logger.info("Starting partition receiver on event hub {} at partition {} from timestamp {}",
@@ -99,6 +100,21 @@ public class PartitionProcessor
         receiver.setReceiveHandler(receiverHandler, true);
     }
 
+    public void Stop()
+    {
+        logger.info("Closing receiver on event hub {} for partition {}", eventHubPath, partitionId);
+        if (receiver != null)
+        {
+            try {
+                receiver.closeSync();
+            }
+            catch (Exception e)
+            {
+                logger.error("Error on closing partition receiver", e);
+            }
+        }
+    }
+
     class SingleHostPartitionReceiveHandler extends PartitionReceiveHandler
     {
 
@@ -120,11 +136,20 @@ public class PartitionProcessor
         @Override
         public void onReceive(Iterable<EventData> events)
         {
-            EventData[] data = Iterables.toArray(events, EventData.class);
-            if (data.length > 0) {
-                this.partitionContext.setOffsetAndSequenceNumber(data[data.length - 1]);
-            }
+            EventData[] data;
 
+            if (events == null)
+            {
+                // Convert an null set of events to an empty set
+                data = new EventData[0];
+            }
+            else
+            {
+                data = Iterables.toArray(events, EventData.class);
+                if (data.length > 0) {
+                    this.partitionContext.setOffsetAndSequenceNumber(data[data.length - 1]);
+                }
+            }
             logger.info("Received {} events", data.length);
 
             for (EventData d : data)
@@ -133,6 +158,7 @@ public class PartitionProcessor
                 logger.info("Received event {}", stringContent);
             }
 
+            Boolean userError = false;
             try {
                 userProcessor.onEvents(partitionContext, data);
             }
@@ -140,8 +166,23 @@ public class PartitionProcessor
             {
                 logger.warn("Error in user processor", ex);
                 userProcessor.onError(partitionContext, ex);
-
+                userError = true;
                 // TODO - do we checkpoint on error?
+            }
+
+            if (userError)
+            {
+                // Write out all of the events-in-error to a error records directory
+                // TODO
+
+                // Checkpoint and keep going
+                try {
+                    this.partitionContext.checkpoint();
+                }
+                catch (Exception e)
+                {
+                    logger.warn("Could not checkpoint after user error", e);
+                }
             }
         }
 
@@ -149,7 +190,9 @@ public class PartitionProcessor
         public void onError(Throwable throwable)
         {
             userProcessor.onError(partitionContext, throwable);
-            logger.warn("Error in partition receiver: {}", throwable.toString());
+            logger.warn("Error in partition receiver: {}: {}", throwable.getLocalizedMessage());
+
+
         }
     }
 }

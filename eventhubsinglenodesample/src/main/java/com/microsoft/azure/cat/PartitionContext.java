@@ -117,4 +117,13 @@ public class PartitionContext
         Checkpoint capturedCheckpoint = new Checkpoint(this.partitionId, this.offset, this.sequenceNumber);
         checkpointManager.updateCheckpoint((Lease) null, capturedCheckpoint).get();
     }
+
+    public String getCurrentOffset()
+    {
+        return this.offset;
+    }
+
+    public String getPartitionId() {
+        return this.partitionId;
+    }
 }

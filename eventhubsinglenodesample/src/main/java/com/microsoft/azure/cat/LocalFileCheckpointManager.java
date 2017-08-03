@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import com.microsoft.azure.servicebus.ConnectionStringBuilder;
 import org.slf4j.Logger;
@@ -80,6 +81,16 @@ public class LocalFileCheckpointManager implements ICheckpointManager
             // Attempt to create the directory if it doesn't exist
             Files.createDirectory(eventHubDirectory);
             logger.info("Created checkpoint directory for EventHub {}: {}", eventHubName, eventHubDirectory);
+        }
+    }
+
+    public void shutdown()
+    {
+        this.executor.shutdown();
+        try {
+            this.executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+
         }
     }
 
@@ -178,7 +189,7 @@ public class LocalFileCheckpointManager implements ICheckpointManager
                 Path checkpointFile = eventHubDirectory.resolve(checkpoint.getPartitionId());
                 Files.write(checkpointFile, raw);
 
-                logger.info("Updating checkpoint file {} for event hub {} with {}",
+                logger.debug("Updating checkpoint file {} for event hub {} with {}",
                         checkpointFile, eventHubName, gson.toJson(checkpoint));
             }
             catch (IOException e)
