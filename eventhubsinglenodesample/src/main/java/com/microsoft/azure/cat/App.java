@@ -1,11 +1,16 @@
 package com.microsoft.azure.cat;
 
+import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
@@ -21,12 +26,23 @@ public class App
 
             String hostName = GetHostName();
 
-            // Get Event Hub name and connection string from environment
-            String eventHubConnectionString = "Endpoint=sb://alsonotrealz.servicebus.windows.net/;SharedAccessKeyName=AzmonReader;SharedAccessKey=notrealz;EntityPath=insights-operational-logs";
-            String eventHubName = "insights-operational-logs";
-            logger.info("Creating processor host");
+            // Get Event Hub name and connection string from configuration properties
+            Properties eventHubProperties = LoadProperties("eventhub.properties");
+            String eventHubConnectionString = eventHubProperties.getProperty("eventhub.connectionString").replace("\"", "");;
+            String eventHubName = eventHubProperties.getProperty("eventhub.name").replace("\"", "");;
 
-            CreateProcessorHost(hostName, eventHubName, eventHubConnectionString, "");
+            String directoryName = eventHubProperties.getProperty("eventhub.checkpointDirectory").replace("\"", "");
+            String checkpointDirectory = Paths.get(directoryName).toAbsolutePath().normalize().toString();
+
+            String consumerGroup = eventHubProperties.getProperty("eventhub.consumerGroup");
+            if (Strings.isNullOrEmpty(consumerGroup))
+                consumerGroup = "$Default";
+
+            logger.info("Creating processor host for event hub {} consumer group {}",
+                    eventHubName, consumerGroup);
+            logger.info("Using checkpoint directory {}", checkpointDirectory);
+
+            CreateProcessorHost(hostName, eventHubName, eventHubConnectionString, consumerGroup, checkpointDirectory);
 
             Scanner scanner = new Scanner(System.in);
             String line = scanner.nextLine();
@@ -51,11 +67,9 @@ public class App
     }
 
     public static void CreateProcessorHost(String hostName, String eventHubName,
-                                           String eventHubConnectionString, String consumerGroup) {
+        String eventHubConnectionString, String consumerGroup, String checkpointDirectory)
+    {
         try {
-            // Use the local directory as the checkpoint directory (TODO - pull from config)
-            String checkpointDirectory = Paths.get(".").toAbsolutePath().normalize().toString();
-
             // Use the content routing processor for handling events from Event Hub
             Function<Void, IEventProcessor> factoryFunction = (Void) -> new ContentRoutingProcessor();
 
@@ -76,21 +90,14 @@ public class App
         }
     }
 
-    public static void ConfigureNativeLogging()
+    static Properties LoadProperties(String resourceName) throws IOException
     {
-        //java.util.logging.LogManager logManager = java.util.logging.LogManager.getLogManager();
-
-        // Programmatic configuration
-        //System.setProperty("java.util.logging.SimpleFormatter.format",
-        //        "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$-7s [%3$s] (%2$s) %5$s %6$s%n");
-
-        //java.util.logging.ConsoleHandler consoleHandler = new java.util.logging.ConsoleHandler();
-        //consoleHandler.setLevel(java.util.logging.Level.FINEST);
-        //consoleHandler.setFormatter(new java.util.logging.SimpleFormatter());
-
-        java.util.logging.Logger rootLogger = java.util.logging.LogManager.getLogManager().getLogger("");
-        rootLogger.info("Testing native java.util logging");
-
-        //rootLogger.addHandler(consoleHandler);
+        logger.info("Loading resource {}", resourceName);
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        Properties props = new Properties();
+        try(InputStream resourceStream = loader.getResourceAsStream(resourceName)) {
+            props.load(resourceStream);
+        }
+        return props;
     }
-}
+ }

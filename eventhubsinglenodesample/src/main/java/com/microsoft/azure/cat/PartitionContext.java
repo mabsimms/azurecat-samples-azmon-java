@@ -79,8 +79,10 @@ public class PartitionContext
         Checkpoint startingCheckpoint = checkpointManager.getCheckpoint(this.partitionId).get();
         if (startingCheckpoint == null)
         {
+            // TODO - make this configurable
             // No checkpoint was ever stored. Start from current time
-            startAt = Instant.now();
+            //startAt = Instant.now();
+            startAt = 0;
         }
         else
         {

@@ -89,6 +89,7 @@ public class PartitionProcessor
 
         // Set up the partition receiver and callback function
         // TODO - make max event count configurable
+        logger.info("Assigning host partition receiver");
         this.receiverHandler = new SingleHostPartitionReceiveHandler(
                 this,
                 partitionContext,

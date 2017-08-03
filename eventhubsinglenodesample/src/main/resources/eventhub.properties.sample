@@ -1,0 +1,14 @@
+#########################################################################
+# Event Hub properties for reading Azure Monitor and related information
+
+# The name (path) of the event hub
+eventhub.name="insights-operational-logs"
+
+# The shared access policy based connection string (with Listen) permissions for this event hub
+eventhub.connectionString="Endpoint=sb://yournamespacehere.servicebus.windows.net/;SharedAccessKeyName=AzmonReader;SharedAccessKey=[shared access key here];EntityPath=insights-operational-logs"
+
+# Checkpoint directory.  Leave blank to use working directory of the app
+eventhub.checkpointDirectory="checkpoints/"
+
+# Consumer group name; leave blank to use "$Default"
+eventhub.consumerGroup="$Default"

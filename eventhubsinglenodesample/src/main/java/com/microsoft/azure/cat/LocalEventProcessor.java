@@ -60,7 +60,7 @@ public class LocalEventProcessor
         try
         {
             // Create a local checkpoint manager for saving progress to local directories
-            this.checkpointManager = new LocalFileCheckpointManager(checkpointDirectory, eventHubName);
+            this.checkpointManager = new LocalFileCheckpointManager(checkpointDirectory, eventHubName, true);
             checkpointManager.initialize();
 
             // Create a event hub client and get the event hub context and information (including partition count)

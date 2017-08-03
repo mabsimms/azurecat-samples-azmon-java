@@ -50,7 +50,7 @@ public class LocalFileCheckpointManager implements ICheckpointManager
         Path checkpointPath = FileSystems.getDefault().getPath(checkpointDirectory);
         if (!Files.exists(checkpointPath, LinkOption.NOFOLLOW_LINKS))
         {
-            if (autoCreatePath)
+            if (!autoCreatePath)
             {
                 throw new IOException("Path " + checkpointDirectory + " does not exist and autoCreatePath set to false");
             }
